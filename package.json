@@ -16,7 +16,7 @@
   ],
   "directus:extension": {
     "type": "interface",
-    "path": "dist/index.js",
+    "path": "../../../extensions/interfaces/directus-extension-wpslug-interface/index.js",
     "source": "src/index.ts",
     "host": "^v9.9.0"
   },

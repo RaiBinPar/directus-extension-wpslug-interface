@@ -1,16 +1,6 @@
 <template>
-	<v-input
-		v-if="isEditing && !disabled"
-		:autofocus="true"
-		:model-value="value"
-		:placeholder="placeholder"
-		:trim="trim"
-		:slug="true"
-		slug-separator="-"
-		@update:model-value="onChange"
-		@blur="disableEdit"
-		@keydown="onKeyPress"
-	>
+	<v-input v-if="isEditing && !disabled" :autofocus="true" :model-value="value" :placeholder="placeholder" :trim="trim"
+		:slug="true" slug-separator="-" @update:model-value="onChange" @blur="disableEdit" @keydown="onKeyPress">
 		<template v-if="iconLeft || renderedPrefix" #prepend>
 			<v-icon v-if="iconLeft" :name="iconLeft" />
 			<span class="prefixsuffix">{{ renderedPrefix }}</span>
@@ -29,15 +19,8 @@
 			<v-icon name="edit" />
 		</v-button>
 
-		<v-button
-			v-if="isDiffer && !isTouched"
-			v-tooltip="t('auto_generate')"
-			x-small
-			secondary
-			icon
-			class="action-button"
-			@click="setByCurrentState"
-		>
+		<v-button v-if="isDiffer && !isTouched" v-tooltip="t('auto_generate')" x-small secondary icon class="action-button"
+			@click="setByCurrentState">
 			<v-icon name="auto_fix_high" />
 		</v-button>
 	</div>
@@ -116,12 +99,14 @@ export default defineComponent({
 			() => renderedPrefix.value + (props.value || props.placeholder || attrs['field-data']?.meta.field) + renderedSuffix.value
 		);
 		const isDiffer = computed<boolean>(() => {
-			const transformed = transform(render(props.template, values.value));
+			const transformed = transform(render(props.template || 'example', values.value));
 			if (transformed === (props.value || '')) return false;
 			return (transformed !== (props.value || '').replace(/-\d+$/, ''));
 		});
 
-		watch(values, (values: Record<string, any>) => {
+
+
+		watch(values, debounce((values: Record<string, any>) => {
 			// Reject manual touching.
 			if (isEditing.value || isTouched.value) return;
 
@@ -129,10 +114,11 @@ export default defineComponent({
 			if (!(props.primaryKey !== '+' ? props.update.includes('update') : props.update.includes('create'))) return;
 
 			// Avoid self update.
-			if (values[props.field] && (values[props.field] || '') !== (props.value || '')) return;
+			// console.log({ field: props.field, value: props.value, newValue: values[props.field]})
+			if (values[props.field] && ((values[props.field] || '') !== (props.value || ''))) return;
 
 			emitter(values);
-		});
+		}, 200, false));
 
 		return {
 			t,
@@ -153,6 +139,7 @@ export default defineComponent({
 		function onKeyPress(event: KeyboardEvent) {
 			if (event.key === 'Escape') {
 				// Temporary disable triming to avoid overwriting of the model value by the blur event inside v-input.
+
 				trim.value = false;
 				isTouched.value = false;
 				emit('input', cachedValueBeforeEdit.value);
@@ -176,7 +163,7 @@ export default defineComponent({
 		}
 
 		function transform(value: string) {
-			return slugify(value, { separator: '-', preserveTrailingDash: true }).slice(0, props.length);
+			return slugify(value || '', { separator: '-', preserveTrailingDash: true }).slice(0, props.length);
 		}
 
 		function setByCurrentState() {
@@ -184,11 +171,38 @@ export default defineComponent({
 			emitter(values.value);
 		}
 
+		function debounce(func, wait, immediate) {
+			let timeout;
+
+			return function () {
+				const context = this, args = arguments;
+
+				const later = function () {
+					timeout = null;
+					if (!immediate) func.apply(context, args);
+				};
+
+				const callNow = immediate && !timeout;
+
+				clearTimeout(timeout);
+				timeout = setTimeout(later, wait);
+
+				if (callNow) func.apply(context, args);
+			};
+		}
+
 		function emitter(values: Record<string, any>) {
-			const newValue = transform(render(props.template, values));
+			const valueRender = render(props.template || '', values);
+			const newValue = transform(valueRender);
 			if (newValue === (props.value || '')) return;
 
-			emit('input', newValue);
+
+			if (newValue === '') {
+				emit('input', 'slug');
+				return;
+			};
+
+			emit('input', newValue)
 		}
 
 		function enableEdit(): void {
